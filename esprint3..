@@ -1,0 +1,348 @@
+#include <iostream>
+#include <fstream>
+#include <string>
+using namespace std;
+
+// ===== ESTRUCTURA =====
+struct producto {
+    string nombre;
+    string codigo;
+    string categoria;
+    double cantidad;
+    double precio;
+};
+
+// ===== VARIABLES =====
+string categorias[50];
+char prefijoCat[50];
+int totalCat = 0;
+int contadorCat[50] = { 0 };
+
+string usuarioActual = "";
+
+// ===== REGISTRO DE ACCIONES =====
+void registrarAccion(string accion) {
+    ofstream file("registro.txt", ios::app);
+    file << usuarioActual << " -> " << accion << endl;
+    file.close();
+}
+
+// ===== LEER TEXTO =====
+string leerTexto(string msg) {
+    string txt;
+    do {
+        cout << msg;
+        getline(cin, txt);
+    } while (txt.empty());
+    return txt;
+}
+
+// ===== LEER NUMERO =====
+double leerNumero(string msg) {
+    string linea;
+    double num;
+
+    while (true) {
+        cout << msg;
+        getline(cin, linea);
+
+        try {
+            num = stod(linea);
+            if (num <= 0) throw 1;
+            return num;
+        }
+        catch (...) {
+            cout << "❌ Numero invalido\n";
+        }
+    }
+}
+
+// ===== BUSCAR CATEGORIA =====
+int buscarCategoriaIndex(string cat) {
+    for (int i = 0; i < totalCat; i++)
+        if (categorias[i] == cat) return i;
+    return -1;
+}
+
+// ===== GENERAR CODIGO =====
+string generarCodigo(int indexCat) {
+    contadorCat[indexCat]++;
+    int num = contadorCat[indexCat];
+
+    string numero = (num < 10 ? "0" : "") + to_string(num);
+    return string(1, prefijoCat[indexCat]) + numero;
+}
+
+// ===== GUARDAR PRODUCTOS =====
+void guardarArchivo(producto p[], int n) {
+    ofstream file("productos.txt");
+
+    for (int i = 0; i < n; i++) {
+        file << p[i].codigo << "|"
+            << p[i].nombre << "|"
+            << p[i].categoria << "|"
+            << p[i].cantidad << "|"
+            << p[i].precio << endl;
+    }
+
+    file.close();
+}
+
+// ===== EXTRAER CAMPO =====
+string obtenerCampo(string linea, int& pos) {
+    int siguiente = linea.find('|', pos);
+    string dato;
+
+    if (siguiente == -1) {
+        dato = linea.substr(pos);
+        pos = linea.length();
+    }
+    else {
+        dato = linea.substr(pos, siguiente - pos);
+        pos = siguiente + 1;
+    }
+
+    return dato;
+}
+
+// ===== CARGAR PRODUCTOS =====
+void cargarArchivo(producto p[], int& n) {
+    ifstream file("productos.txt");
+    string linea;
+
+    while (getline(file, linea)) {
+        int pos = 0;
+
+        p[n].codigo = obtenerCampo(linea, pos);
+        p[n].nombre = obtenerCampo(linea, pos);
+        p[n].categoria = obtenerCampo(linea, pos);
+
+        string cant = obtenerCampo(linea, pos);
+        string prec = obtenerCampo(linea, pos);
+
+        p[n].cantidad = stod(cant);
+        p[n].precio = stod(prec);
+
+        int index = buscarCategoriaIndex(p[n].categoria);
+
+        if (index == -1) {
+            categorias[totalCat] = p[n].categoria;
+            prefijoCat[totalCat] = p[n].codigo[0];
+            contadorCat[totalCat] = 0;
+            index = totalCat++;
+        }
+
+        int num = stoi(p[n].codigo.substr(1));
+        if (num > contadorCat[index]) {
+            contadorCat[index] = num;
+        }
+
+        n++;
+    }
+
+    file.close();
+}
+
+// ===== REGISTRAR =====
+void registrar(producto p[], int& n) {
+    cout << "\n=== REGISTRAR PRODUCTO ===\n";
+
+    p[n].nombre = leerTexto("Nombre: ");
+    p[n].categoria = leerTexto("Categoria: ");
+
+    int index = buscarCategoriaIndex(p[n].categoria);
+
+    if (index == -1) {
+        categorias[totalCat] = p[n].categoria;
+        prefijoCat[totalCat] = 'a' + totalCat;
+        contadorCat[totalCat] = 0;
+        index = totalCat++;
+    }
+
+    p[n].codigo = generarCodigo(index);
+    cout << "Codigo: " << p[n].codigo << endl;
+
+    double cant;
+    while (true) {
+        cant = leerNumero("Cantidad: ");
+        if (cant > 20)
+            cout << "❌ Maximo 20\n";
+        else break;
+    }
+
+    p[n].cantidad = cant;
+    p[n].precio = leerNumero("Precio: ");
+
+    guardarArchivo(p, n + 1);
+
+    registrarAccion("REGISTRO: " + p[n].codigo + " | " + p[n].nombre);
+
+    cout << "✔ Producto guardado\n";
+    n++;
+}
+
+// ===== LISTAR =====
+void listar(producto p[], int n) {
+    cout << "\n=== PRODUCTOS ===\n";
+
+    for (int i = 0; i < n; i++) {
+        cout << p[i].codigo << " | "
+            << p[i].nombre << " | "
+            << p[i].categoria << " | "
+            << p[i].cantidad << " | "
+            << p[i].precio << endl;
+    }
+}
+
+// ===== VENDER =====
+void vender(producto p[], int n) {
+    string cod = leerTexto("Codigo: ");
+
+    for (int i = 0; i < n; i++) {
+        if (p[i].codigo == cod) {
+
+            double cant = leerNumero("Cantidad: ");
+
+            if (cant <= p[i].cantidad) {
+                p[i].cantidad -= cant;
+                guardarArchivo(p, n);
+
+                registrarAccion("VENTA: " + cod + " | cantidad: " + to_string(cant));
+
+                cout << "✔ Venta realizada\n";
+            }
+            else {
+                cout << "❌ Stock insuficiente\n";
+            }
+            return;
+        }
+    }
+
+    cout << "❌ Producto no encontrado\n";
+}
+
+// ===== ELIMINAR =====
+void eliminar(producto p[], int& n) {
+    string cod = leerTexto("Codigo: ");
+
+    for (int i = 0; i < n; i++) {
+        if (p[i].codigo == cod) {
+
+            for (int j = i; j < n - 1; j++)
+                p[j] = p[j + 1];
+
+            n--;
+            guardarArchivo(p, n);
+
+            registrarAccion("ELIMINADO: " + cod);
+
+            cout << "✔ Eliminado\n";
+            return;
+        }
+    }
+
+    cout << "❌ No encontrado\n";
+}
+
+// ===== LOGIN =====
+int iniciarSesion() {
+    string usuario, contrasena;
+
+    cout << "\n=== INICIO DE SESION ===\n";
+
+    usuario = leerTexto("Usuario: ");
+    contrasena = leerTexto("Contrasena: ");
+
+    if (usuario == "cajero" && contrasena == "password") {
+        usuarioActual = "CAJERO";
+        cout << "✔ Acceso como Cajero\n";
+        return 1;
+    }
+
+    if (usuario == "inventario" && contrasena == "password") {
+        usuarioActual = "INVENTARIO";
+        cout << "✔ Acceso como Inventario\n";
+        return 2;
+    }
+
+    cout << "❌ Credenciales incorrectas\n";
+    return 0;
+}
+
+// ===== MAIN =====
+int main() {
+    producto p[100];
+    int n = 0;
+
+    cargarArchivo(p, n);
+
+    string opStr;
+    int op, rol;
+
+    do {
+        rol = iniciarSesion();
+
+        if (rol == 0) continue;
+
+        // ===== CAJERO =====
+        if (rol == 1) {
+            do {
+                cout << "\n=== MENU CAJERO ===\n";
+                cout << "1 Ver productos\n";
+                cout << "2 Vender\n";
+                cout << "3 Cerrar sesion\n";
+                cout << "Opcion: ";
+
+                getline(cin, opStr);
+
+                try {
+                    op = stoi(opStr);
+                }
+                catch (...) {
+                    cout << "❌ Opcion invalida\n";
+                    continue;
+                }
+
+                switch (op) {
+                case 1: listar(p, n); break;
+                case 2: vender(p, n); break;
+                }
+
+            } while (op != 3);
+        }
+
+        // ===== INVENTARIO =====
+        else if (rol == 2) {
+            do {
+                cout << "\n=== MENU INVENTARIO ===\n";
+                cout << "1 Registrar\n";
+                cout << "2 Listar\n";
+                cout << "3 Eliminar\n";
+                cout << "4 Vender\n";
+                cout << "5 Cerrar sesion\n";
+                cout << "Opcion: ";
+
+                getline(cin, opStr);
+
+                try {
+                    op = stoi(opStr);
+                }
+                catch (...) {
+                    cout << "❌ Opcion invalida\n";
+                    continue;
+                }
+
+                switch (op) {
+                case 1: registrar(p, n); break;
+                case 2: listar(p, n); break;
+                case 3: eliminar(p, n); break;
+                case 4: vender(p, n); break;
+                }
+
+            } while (op != 5);
+        }
+
+    } while (true);
+
+    return 0;
+}
